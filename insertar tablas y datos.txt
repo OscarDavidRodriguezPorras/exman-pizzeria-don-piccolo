@@ -1,0 +1,223 @@
+-- ============================================================
+-- BASE DE DATOS: PIZZERÍA DON PICCOLO
+-- ============================================================
+
+CREATE DATABASE IF NOT EXISTS pizzeria_don_piccolo;
+USE pizzeria_don_piccolo;
+
+-- ------------------------------------------------------------
+-- 1. TABLA: clientes
+-- ------------------------------------------------------------
+CREATE TABLE clientes (
+    id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    telefono VARCHAR(20) NOT NULL,
+    direccion VARCHAR(255) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ------------------------------------------------------------
+-- 2. TABLA: ingredientes
+-- ------------------------------------------------------------
+CREATE TABLE ingredientes (
+    id_ingrediente INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(50) NOT NULL,
+    stock_actual DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    stock_minimo DECIMAL(10,2) NOT NULL DEFAULT 5.00,
+    costo_unitario DECIMAL(10,2) NOT NULL
+);
+
+-- ------------------------------------------------------------
+-- 3. TABLA: pizzas
+-- ------------------------------------------------------------
+CREATE TABLE pizzas (
+    id_pizza INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    tamano ENUM('personal', 'mediana', 'familiar') NOT NULL,
+    precio_base DECIMAL(10,2) NOT NULL,
+    tipo ENUM('vegetariana', 'especial', 'clasica') NOT NULL
+);
+
+-- ------------------------------------------------------------
+-- 4. TABLA INTERMEDIA: pizza_ingredientes (Receta N:M)
+-- ------------------------------------------------------------
+CREATE TABLE pizza_ingredientes (
+    id_pizza INT NOT NULL,
+    id_ingrediente INT NOT NULL,
+    cantidad_requerida DECIMAL(10,2) NOT NULL,
+    PRIMARY KEY (id_pizza, id_ingrediente),
+    FOREIGN KEY (id_pizza) REFERENCES pizzas(id_pizza) ON DELETE CASCADE,
+    FOREIGN KEY (id_ingrediente) REFERENCES ingredientes(id_ingrediente) ON DELETE CASCADE
+);
+
+-- ------------------------------------------------------------
+-- 5. TABLA: repartidores
+-- ------------------------------------------------------------
+CREATE TABLE repartidores (
+    id_repartidor INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    zona_asignada VARCHAR(50) NOT NULL,
+    estado ENUM('disponible', 'ocupado') DEFAULT 'disponible'
+);
+
+-- ------------------------------------------------------------
+-- 6. TABLA: pedidos
+-- ------------------------------------------------------------
+CREATE TABLE pedidos (
+    id_pedido INT AUTO_INCREMENT PRIMARY KEY,
+    id_cliente INT NOT NULL,
+    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
+    metodo_pago ENUM('efectivo', 'tarjeta', 'app') NOT NULL,
+    estado ENUM('pendiente', 'en preparacion', 'entregado', 'cancelado') DEFAULT 'pendiente',
+    total DECIMAL(10,2) DEFAULT 0.00,
+    FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente)
+);
+
+-- ------------------------------------------------------------
+-- 7. TABLA INTERMEDIA: detalle_pedidos (Ítems N:M)
+-- ------------------------------------------------------------
+CREATE TABLE detalle_pedidos (
+    id_detalle INT AUTO_INCREMENT PRIMARY KEY,
+    id_pedido INT NOT NULL,
+    id_pizza INT NOT NULL,
+    cantidad INT NOT NULL DEFAULT 1,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
+    FOREIGN KEY (id_pizza) REFERENCES pizzas(id_pizza)
+);
+
+-- ------------------------------------------------------------
+-- 8. TABLA: domicilios (Relación 1:1 con pedidos)
+-- ------------------------------------------------------------
+CREATE TABLE domicilios (
+    id_domicilio INT AUTO_INCREMENT PRIMARY KEY,
+    id_pedido INT UNIQUE NOT NULL,
+    id_repartidor INT NOT NULL,
+    hora_salida DATETIME NULL,
+    hora_entrega DATETIME NULL,
+    distancia_km DECIMAL(5,2) NOT NULL,
+    costo_envio DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
+    FOREIGN KEY (id_repartidor) REFERENCES repartidores(id_repartidor)
+);
+
+-- ------------------------------------------------------------
+-- 9. TABLA: pagos (Gestión independiente de pagos)
+-- ------------------------------------------------------------
+CREATE TABLE pagos (
+    id_pago INT AUTO_INCREMENT PRIMARY KEY,
+    id_pedido INT NOT NULL,
+    metodo_pago ENUM('efectivo', 'tarjeta', 'app') NOT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    estado_pago ENUM('pendiente', 'completado', 'fallido') DEFAULT 'pendiente',
+    referencia_transaccion VARCHAR(100) NULL,
+    fecha_pago DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido) ON DELETE CASCADE
+);
+
+-- ------------------------------------------------------------
+-- 10. TABLA: historial_precios (Auditoría de Pizzas)
+-- ------------------------------------------------------------
+CREATE TABLE historial_precios (
+    id_historial INT AUTO_INCREMENT PRIMARY KEY,
+    id_pizza INT NOT NULL,
+    precio_anterior DECIMAL(10,2) NOT NULL,
+    precio_nuevo DECIMAL(10,2) NOT NULL,
+    fecha_cambio DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_pizza) REFERENCES pizzas(id_pizza)
+);
+
+
+-- ============================================================
+-- INSERCIÓN DE DATOS PRUEBA - PIZZERÍA DON PICCOLO
+-- ============================================================
+USE pizzeria_don_piccolo;
+
+-- 1. Insertar Clientes
+INSERT INTO clientes (nombre, telefono, direccion, email) VALUES
+('Carlos Mendoza', '3151234567', 'Calle 10 # 15-20, Centro', 'carlos.mendoza@email.com'),
+('Ana María Gómez', '3109876543', 'Carrera 25 # 40-12, Norte', 'ana.gomez@email.com'),
+('Luis Fernando Torres', '3185551234', 'Diagonal 18 # 5-45, Sur', 'luis.torres@email.com'),
+('Laura Sofía Rodríguez', '3124449988', 'Calle 50 # 30-10, Cabecera', 'laura.rodriguez@email.com'),
+('Andrés Felipe Silva', '3007778899', 'Carrera 12 # 8-60, Cañaveral', 'andres.silva@email.com');
+
+-- 2. Insertar Ingredientes
+INSERT INTO ingredientes (nombre, stock_actual, stock_minimo, costo_unitario) VALUES
+('Queso Mozzarella (kg)', 15.50, 5.00, 18000.00),
+('Salsa de Tomate (L)', 20.00, 4.00, 8000.00),
+('Masa de Pizza (Unidad)', 50.00, 10.00, 2500.00),
+('Pepperoni (kg)', 8.00, 3.00, 32000.00),
+('Jamón (kg)', 2.50, 4.00, 22000.00), -- Bajo stock a propósito
+('Piña en almíbar (kg)', 6.00, 2.00, 12000.00),
+('Champiñones (kg)', 1.80, 2.50, 15000.00); -- Bajo stock a propósito
+
+-- 3. Insertar Pizzas
+INSERT INTO pizzas (nombre, tamano, precio_base, tipo) VALUES
+('Pizza Hawaiana', 'mediana', 35000.00, 'clasica'),
+('Pizza Hawaiana', 'familiar', 52000.00, 'clasica'),
+('Pizza Pepperoni', 'mediana', 38000.00, 'clasica'),
+('Pizza Especial Don Piccolo', 'familiar', 65000.00, 'especial'),
+('Pizza Vegetariana', 'mediana', 34000.00, 'vegetariana');
+
+-- 4. Recetas (Relación Pizza - Ingredientes)
+INSERT INTO pizza_ingredientes (id_pizza, id_ingrediente, cantidad_requerida) VALUES
+-- Pizza Hawaiana Mediana (ID 1)
+(1, 3, 1.00), -- 1 Masa
+(1, 2, 0.15), -- 150ml Salsa
+(1, 1, 0.20), -- 200g Queso
+(1, 5, 0.15), -- 150g Jamón
+(1, 6, 0.15), -- 150g Piña
+
+-- Pizza Pepperoni Mediana (ID 3)
+(3, 3, 1.00), -- 1 Masa
+(3, 2, 0.15), -- 150ml Salsa
+(3, 1, 0.20), -- 200g Queso
+(3, 4, 0.18), -- 180g Pepperoni
+
+-- Pizza Vegetariana Mediana (ID 5)
+(5, 3, 1.00), -- 1 Masa
+(5, 2, 0.15), -- 150ml Salsa
+(5, 1, 0.18), -- 180g Queso
+(5, 7, 0.20); -- 200g Champiñones
+
+-- 5. Insertar Repartidores
+INSERT INTO repartidores (nombre, zona_asignada, estado) VALUES
+('Javier Ríos', 'Zona Norte', 'disponible'),
+('David Morales', 'Zona Centro', 'ocupado'),
+('Camilo Vargas', 'Zona Sur', 'disponible');
+
+-- 6. Insertar Pedidos
+INSERT INTO pedidos (id_cliente, fecha_hora, metodo_pago, estado, total) VALUES
+(1, '2026-08-20 19:30:00', 'efectivo', 'entregado', 41650.00),
+(2, '2026-08-22 20:15:00', 'tarjeta', 'entregado', 77350.00),
+(3, '2026-08-25 11:00:00', 'app', 'en preparacion', 40460.00),
+(1, '2026-08-25 11:30:00', 'efectivo', 'pendiente', 61880.00);
+
+-- 7. Detalle de los Pedidos
+INSERT INTO detalle_pedidos (id_pedido, id_pizza, cantidad, precio_unitario) VALUES
+-- Pedido 1 (Carlos: Hawaiana Mediana)
+(1, 1, 1, 35000.00),
+-- Pedido 2 (Ana: Especial Familiar)
+(2, 4, 1, 65000.00),
+-- Pedido 3 (Luis: Vegetariana Mediana)
+(3, 5, 1, 34000.00),
+-- Pedido 4 (Carlos: Hawaiana Familiar)
+(4, 2, 1, 52000.00);
+
+-- 8. Insertar Domicilios
+INSERT INTO domicilios (id_pedido, id_repartidor, hora_salida, hora_entrega, distancia_km, costo_envio) VALUES
+(1, 2, '2026-08-20 19:40:00', '2026-08-20 20:05:00', 3.50, 5000.00),
+(2, 1, '2026-08-22 20:25:00', '2026-08-22 20:50:00', 5.00, 7000.00),
+(3, 2, '2026-08-25 11:15:00', NULL, 2.80, 4000.00);
+
+-- 9. Insertar Pagos
+INSERT INTO pagos (id_pedido, metodo_pago, monto, estado_pago, referencia_transaccion) VALUES
+(1, 'efectivo', 41650.00, 'completado', NULL),
+(2, 'tarjeta', 77350.00, 'completado', 'TXN-998812'),
+(3, 'app', 40460.00, 'completado', 'NEQUI-55441');
+
+INSERT INTO historial_precios (id_pizza, precio_anterior, precio_nuevo, fecha_cambio) VALUES
+(1, 32000.00, 35000.00, '2026-06-01 10:00:00'), -- Hawaiana mediana subió de $32.000 a $35.000
+(2, 48000.00, 52000.00, '2026-06-01 10:00:00'), -- Hawaiana familiar subió de $48.000 a $52.000
+(3, 35000.00, 38000.00, '2026-07-15 09:30:00'); -- Pepperoni mediana subió de $35.000 a $38.000

@@ -1,0 +1,56 @@
+delimiter //
+create trigger trg_descontar_stock after insert on detalle_pedidos
+for each row
+begin
+update ingredientes i join pizza_ingredientes pi on i.id_ingrediente = pi.id_ingrediente
+set i.stock_actual = i.stock_actual - (new.cantidad * pi.cantidad_requerida) where pi.id_pizza = new.id_pizza;
+end //
+delimiter ;
+
+
+delimiter //
+create trigger trg_auditoria_precios after update on pizzas
+for each row
+begin
+if old.precio_base <> new.precio_base then insert into historial_precios (id_pizza, precio_anterior, precio_nuevo, fecha_cambio) values (new.id_pizza, old.precio_base, new.precio_base, now());
+end if;
+end //
+delimiter ;
+
+delimiter //
+create trigger trg_liberar_repartidor after update on domicilios
+for each row
+begin
+if new.hora_entrega is not null then update repartidores
+set estado = 'disponible' where id_repartidor = new.id_repartidor;
+end if;
+end //
+delimiter ;
+
+
+delimiter //
+create trigger trg_ocupar_repartidor after insert on domicilios
+for each row
+begin
+update repartidores set estado = 'ocupado' where id_repartidor = new.id_repartidor;
+end //
+delimiter ;
+
+
+delimiter //
+create trigger trg_actualizar_total_detalle after insert on detalle_pedidos
+for each row
+begin
+update pedidos set total = fn_calcular_total_pedido(new.id_pedido) where id_pedido = new.id_pedido;
+end //
+delimiter ;
+
+
+delimiter //
+create trigger trg_actualizar_total_domicilio after insert on domicilios
+for each row
+begin
+update pedidos set total = fn_calcular_total_pedido(new.id_pedido) where id_pedido = new.id_pedido;
+end //
+delimiter ;
+

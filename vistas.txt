@@ -1,0 +1,23 @@
+delimiter //
+create view vw_resumen_pedidos_cliente as select c.id_cliente, c.nombre as cliente, count(p.id_pedido) as total_pedidos,
+case 
+when sum(p.total) is null then 0
+else sum(p.total)
+end as total_gastado from clientes c left join pedidos p on c.id_cliente = p.id_cliente group by c.id_cliente, c.nombre
+//
+delimiter ;
+
+
+delimiter //
+create view vw_desempeno_repartidores as
+select r.id_repartidor, r.nombre as repartidor, r.zona_asignada, count(d.id_domicilio) as entregas_realizadas,
+avg(timestampdiff(minute, d.hora_salida, d.hora_entrega)) as promedio_minutos_entrega from repartidores r left join domicilios d on r.id_repartidor = d.id_repartidor group by r.id_repartidor, r.nombre, r.zona_asignada
+//
+delimiter ;
+
+
+delimiter //
+create view vw_ingredientes_bajo_stock as
+select id_ingrediente, nombre as ingrediente, stock_actual,stock_minimo from ingredientes where stock_actual < stock_minimo
+//
+delimiter ;
