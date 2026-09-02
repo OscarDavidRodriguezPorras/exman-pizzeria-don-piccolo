@@ -99,7 +99,8 @@ CREATE TABLE domicilios (
     distancia_km DECIMAL(5,2) NOT NULL,
     costo_envio DECIMAL(10,2) NOT NULL,
     FOREIGN KEY (id_pedido) REFERENCES pedidos(id_pedido) ON DELETE CASCADE,
-    FOREIGN KEY (id_repartidor) REFERENCES repartidores(id_repartidor)
+    FOREIGN KEY (id_repartidor) REFERENCES repartidores(id_repartidor),
+    estado ENUM ('en_ruta', 'entregado', 'cancelado')
 );
 
 -- ------------------------------------------------------------
@@ -206,10 +207,10 @@ INSERT INTO detalle_pedidos (id_pedido, id_pizza, cantidad, precio_unitario) VAL
 (4, 2, 1, 52000.00);
 
 -- 8. Insertar Domicilios
-INSERT INTO domicilios (id_pedido, id_repartidor, hora_salida, hora_entrega, distancia_km, costo_envio) VALUES
-(1, 2, '2026-08-20 19:40:00', '2026-08-20 20:05:00', 3.50, 5000.00),
-(2, 1, '2026-08-22 20:25:00', '2026-08-22 20:50:00', 5.00, 7000.00),
-(3, 2, '2026-08-25 11:15:00', NULL, 2.80, 4000.00);
+INSERT INTO domicilios (id_pedido, id_repartidor, hora_salida, hora_entrega, distancia_km, costo_envio, estado) VALUES
+(1, 2, '2026-08-20 19:40:00', '2026-08-20 20:05:00', 3.50, 5000.00, En_ruta),
+(2, 1, '2026-08-22 20:25:00', '2026-08-22 20:50:00', 5.00, 7000.00, Entregado),
+(3, 2, '2026-08-25 11:15:00', NULL, 2.80, 4000.00, cancelado);
 
 -- 9. Insertar Pagos
 INSERT INTO pagos (id_pedido, metodo_pago, monto, estado_pago, referencia_transaccion) VALUES
@@ -221,3 +222,29 @@ INSERT INTO historial_precios (id_pizza, precio_anterior, precio_nuevo, fecha_ca
 (1, 32000.00, 35000.00, '2026-06-01 10:00:00'), -- Hawaiana mediana subió de $32.000 a $35.000
 (2, 48000.00, 52000.00, '2026-06-01 10:00:00'), -- Hawaiana familiar subió de $48.000 a $52.000
 (3, 35000.00, 38000.00, '2026-07-15 09:30:00'); -- Pepperoni mediana subió de $35.000 a $38.000
+
+
+
+
+1. Mostrar el nombre del repartidor, cantidad de entregas realizadas (estado='entregado'), y total acumulado de pedidos entregados.
+select r.nombre, count(p.id_pedido) as entregas_realizadas, sum(p.total) as total_acumulado from repartidores r join domicilios d on r.id_repartidor = d.id_repartidor join pedidos p on d.id_pedido = p.id_pedido where p.estado = 'entregado' group by r.id_repartidor, r.nombre;
+
+2. Mostrar los pedidos cuya entrega tomó más de 40 minutos entre hora_salida y hora_entrega
+(Usa TIMESTAMPDIFF(MINUTE, hora_salida, hora_entrega) > 40).
+select * from pedidos join domicilios on pedidos.id_pedido = domicilios.id_pedido where timestampdiff(minute, domicilios.hora_salida, domicilios.hora_entrega) > 40;
+
+3. Mostrar los repartidores con estado 'activo' que no tienen domicilios asignados (usa LEFT JOIN y WHERE domicilio.id_domicilio IS NULL).
+select * from repartidores left join domicilios domicilio on repartidores.id_repartidor = domicilio.id_repartidor where repartidores.estado = 'disponible' and domicilio.id_domicilio is null;
+
+4. Crear una vista vista_desempeno_repartidor que muestre:
+nombre_repartidor
+entregas_totales
+promedio_minutos_entrega
+
+delimiter //
+create view vw_desempeno_repartidores as
+select r.id_repartidor, r.nombre as repartidor, r.zona_asignada, count(d.id_domicilio) as entregas_realizadas,
+avg(timestampdiff(minute, d.hora_salida, d.hora_entrega)) as promedio_minutos_entrega from repartidores r left join domicilios d on r.id_repartidor = d.id_repartidor group by r.id_repartidor, r.nombre, r.zona_asignada
+//
+delimiter ;
+
